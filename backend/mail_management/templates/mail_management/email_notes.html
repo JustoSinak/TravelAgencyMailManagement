@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Email Notes</title>
+</head>
+<body>
+    <h1>Notes for: {{ email.subject }}</h1>
+    <a href="{% url 'email_catalog' %}">Back to Email Catalog</a>
+    <ul>
+        {% for note in notes %}
+        <li>
+            <p>{{ note.content }}</p>
+            <small>By {{ note.author }} on {{ note.created_at|date:"Y-m-d H:i" }}</small>
+        </li>
+        {% empty %}
+        <li>No notes found.</li>
+        {% endfor %}
+    </ul>
+    <h2>Add a Note</h2>
+    <form method="post" action="">
+        {% csrf_token %}
+        <textarea name="content" minlength="10" required></textarea><br>
+        <button type="submit">Add Note</button>
+    </form>
+</body>
+</html>

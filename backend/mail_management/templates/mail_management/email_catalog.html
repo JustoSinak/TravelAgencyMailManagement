@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Email Catalog</title>
+</head>
+<body>
+    <h1>Email Catalog</h1>
+    <form method="get" action="">
+        <input type="text" name="search" placeholder="Search emails..." value="{{ search_term }}">
+        <button type="submit">Search</button>
+    </form>
+    <ul>
+        {% for email in emails %}
+        <li>
+            <h3><a href="{% url 'email_notes' email.id %}">{{ email.subject }}</a></h3>
+            <p>From: {{ email.sender }}</p>
+            <p>{{ email.body|slice:":100" }}{% if email.body|length > 100 %}...{% endif %}</p>
+        </li>
+        {% empty %}
+        <li>No emails found.</li>
+        {% endfor %}
+    </ul>
+</body>
+</html>
