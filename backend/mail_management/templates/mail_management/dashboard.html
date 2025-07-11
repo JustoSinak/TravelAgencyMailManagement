@@ -1,0 +1,272 @@
+{% extends 'mail_management/base.html' %}
+
+{% block title %}Dashboard - Travel Agency Mail Management{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h2><i class="fas fa-tachometer-alt me-2"></i>Dashboard</h2>
+        <p class="text-muted">Welcome back! Here's an overview of your email management activity.</p>
+    </div>
+</div>
+
+<!-- Statistics Cards -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4 class="mb-0">{{ total_emails }}</h4>
+                        <p class="mb-0">Total Emails</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-envelope fa-2x opacity-75"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card bg-warning text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4 class="mb-0">{{ unread_emails }}</h4>
+                        <p class="mb-0">Unread Emails</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-envelope-open fa-2x opacity-75"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card bg-danger text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4 class="mb-0">{{ high_priority }}</h4>
+                        <p class="mb-0">High Priority</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-exclamation-triangle fa-2x opacity-75"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4 class="mb-0">{{ recent_notes.count }}</h4>
+                        <p class="mb-0">Recent Notes</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-sticky-note fa-2x opacity-75"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Main Content Row -->
+<div class="row">
+    <!-- Recent Emails -->
+    <div class="col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-clock me-2"></i>Recent Emails
+                </h5>
+            </div>
+            <div class="card-body">
+                {% for email in recent_emails %}
+                <div class="d-flex justify-content-between align-items-start mb-3 pb-3 {% if not forloop.last %}border-bottom{% endif %}">
+                    <div class="flex-grow-1">
+                        <h6 class="mb-1">
+                            <a href="{% url 'email_notes' email.id %}" class="text-decoration-none">
+                                {% if not email.is_read %}<i class="fas fa-circle text-warning me-1" style="font-size: 0.5rem;"></i>{% endif %}
+                                {{ email.subject|truncatechars:40 }}
+                            </a>
+                        </h6>
+                        <p class="text-muted mb-1 small">{{ email.sender }}</p>
+                        <small class="text-muted">{{ email.received_at|timesince }} ago</small>
+                    </div>
+                    <span class="badge bg-{% if email.priority == 'H' %}danger{% elif email.priority == 'M' %}warning{% else %}success{% endif %}">
+                        {{ email.get_priority_display }}
+                    </span>
+                </div>
+                {% empty %}
+                <div class="text-center py-3">
+                    <i class="fas fa-inbox fa-2x text-muted mb-2"></i>
+                    <p class="text-muted">No emails yet</p>
+                </div>
+                {% endfor %}
+            </div>
+            <div class="card-footer">
+                <a href="{% url 'email_catalog' %}" class="btn btn-primary btn-sm">
+                    <i class="fas fa-eye me-1"></i>View All Emails
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Category Statistics -->
+    <div class="col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-chart-pie me-2"></i>Email Categories
+                </h5>
+            </div>
+            <div class="card-body">
+                {% for category in category_stats %}
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div>
+                        <h6 class="mb-0">{{ category.name }}</h6>
+                        <small class="text-muted">{{ category.description|truncatechars:30 }}</small>
+                    </div>
+                    <div class="text-end">
+                        <span class="badge bg-secondary">{{ category.email_count }}</span>
+                        <div class="progress mt-1" style="width: 100px; height: 6px;">
+                            <div class="progress-bar" role="progressbar" 
+                                 style="width: {% widthratio category.email_count total_emails 100 %}%"></div>
+                        </div>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="text-center py-3">
+                    <i class="fas fa-tags fa-2x text-muted mb-2"></i>
+                    <p class="text-muted">No categories yet</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Notes and Quick Actions -->
+<div class="row">
+    <!-- Recent Notes -->
+    <div class="col-md-8 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-sticky-note me-2"></i>Recent Notes
+                </h5>
+            </div>
+            <div class="card-body">
+                {% for note in recent_notes %}
+                <div class="note-item mb-3">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <div>
+                            <h6 class="mb-1">
+                                <a href="{% url 'email_notes' note.email.id %}" class="text-decoration-none">
+                                    {{ note.email.subject|truncatechars:50 }}
+                                </a>
+                            </h6>
+                            <small class="text-muted">
+                                by {{ note.author.get_full_name|default:note.author.username }} • 
+                                {{ note.created_at|timesince }} ago
+                            </small>
+                        </div>
+                    </div>
+                    <p class="mb-0">{{ note.content|truncatechars:100 }}</p>
+                </div>
+                {% empty %}
+                <div class="text-center py-3">
+                    <i class="fas fa-sticky-note fa-2x text-muted mb-2"></i>
+                    <p class="text-muted">No notes yet</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Quick Actions -->
+    <div class="col-md-4 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-bolt me-2"></i>Quick Actions
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a href="{% url 'email_catalog' %}?is_read=false" class="btn btn-outline-warning">
+                        <i class="fas fa-envelope me-2"></i>View Unread Emails
+                    </a>
+                    <a href="{% url 'email_catalog' %}?priority=H" class="btn btn-outline-danger">
+                        <i class="fas fa-exclamation-triangle me-2"></i>High Priority Emails
+                    </a>
+                    <button class="btn btn-outline-primary" onclick="loadRecommendations()">
+                        <i class="fas fa-star me-2"></i>Get Recommendations
+                    </button>
+                    <button class="btn btn-outline-info" onclick="refreshDashboard()">
+                        <i class="fas fa-sync-alt me-2"></i>Refresh Dashboard
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- System Status -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-heartbeat me-2"></i>System Status
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span>Email Classification</span>
+                    <span class="badge bg-success">Active</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span>Real-time Updates</span>
+                    <span class="badge bg-success" id="websocket-status">Connected</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <span>Recommendations</span>
+                    <span class="badge bg-success">Available</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function refreshDashboard() {
+    showLoading(true);
+    location.reload();
+}
+
+// Update WebSocket status indicator
+document.addEventListener('DOMContentLoaded', function() {
+    const statusElement = document.getElementById('websocket-status');
+    
+    // Check WebSocket connection status
+    if (typeof socket !== 'undefined' && socket) {
+        if (socket.readyState === WebSocket.OPEN) {
+            statusElement.textContent = 'Connected';
+            statusElement.className = 'badge bg-success';
+        } else {
+            statusElement.textContent = 'Disconnected';
+            statusElement.className = 'badge bg-danger';
+        }
+    } else {
+        statusElement.textContent = 'Unavailable';
+        statusElement.className = 'badge bg-secondary';
+    }
+});
+</script>
+{% endblock %}

@@ -1,24 +1,187 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Email Catalog</title>
-</head>
-<body>
-    <h1>Email Catalog</h1>
-    <form method="get" action="">
-        <input type="text" name="search" placeholder="Search emails..." value="{{ search_term }}">
-        <button type="submit">Search</button>
-    </form>
-    <ul>
-        {% for email in emails %}
-        <li>
-            <h3><a href="{% url 'email_notes' email.id %}">{{ email.subject }}</a></h3>
-            <p>From: {{ email.sender }}</p>
-            <p>{{ email.body|slice:":100" }}{% if email.body|length > 100 %}...{% endif %}</p>
+{% extends 'mail_management/base.html' %}
+
+{% block title %}Email Catalog - Travel Agency Mail Management{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-8">
+        <h2><i class="fas fa-inbox me-2"></i>Email Catalog</h2>
+    </div>
+    <div class="col-md-4">
+        <div class="stats-card p-3 text-center">
+            <h5 class="mb-1">{{ total_emails }}</h5>
+            <small>Total Emails</small>
+        </div>
+    </div>
+</div>
+
+<!-- Search and Filters -->
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="search-box p-3">
+            <form method="get" action="" class="row g-3">
+                <div class="col-md-6">
+                    <input type="text" name="search" class="form-control"
+                           placeholder="Search emails..." value="{{ search_term }}">
+                </div>
+                <div class="col-md-3">
+                    <select name="priority" class="form-select">
+                        <option value="">All Priorities</option>
+                        <option value="H" {% if request.GET.priority == 'H' %}selected{% endif %}>High</option>
+                        <option value="M" {% if request.GET.priority == 'M' %}selected{% endif %}>Medium</option>
+                        <option value="L" {% if request.GET.priority == 'L' %}selected{% endif %}>Low</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-search me-1"></i>Search
+                        <span class="loading-spinner spinner-border spinner-border-sm ms-2" role="status"></span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-primary" onclick="loadRecommendations()">
+                <i class="fas fa-star me-1"></i>Get Recommendations
+            </button>
+            <button class="btn btn-outline-success" onclick="markAllAsRead()">
+                <i class="fas fa-check-double me-1"></i>Mark All Read
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Email List -->
+<div class="row">
+    {% for email in emails %}
+    <div class="col-12 mb-3">
+        <div class="card email-card {% if not email.is_read %}unread{% endif %} priority-{{ email.priority|lower }}">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-md-8">
+                        <h5 class="card-title mb-1">
+                            <a href="{% url 'email_notes' email.id %}" class="text-decoration-none">
+                                {% if not email.is_read %}<i class="fas fa-envelope me-2 text-warning"></i>{% endif %}
+                                {{ email.subject }}
+                            </a>
+                        </h5>
+                        <p class="text-muted mb-1">
+                            <i class="fas fa-user me-1"></i>{{ email.sender }}
+                            <span class="ms-3">
+                                <i class="fas fa-clock me-1"></i>{{ email.received_at|date:"M d, Y H:i" }}
+                            </span>
+                        </p>
+                        <p class="card-text">
+                            {{ email.body|slice:":150" }}{% if email.body|length > 150 %}...{% endif %}
+                        </p>
+
+                        <!-- Categories -->
+                        {% if email.categories.all %}
+                        <div class="mb-2">
+                            {% for category in email.categories.all %}
+                            <span class="badge bg-secondary me-1">{{ category.name }}</span>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-4 text-end">
+                        <!-- Priority Badge -->
+                        <span class="badge bg-{% if email.priority == 'H' %}danger{% elif email.priority == 'M' %}warning{% else %}success{% endif %} mb-2">
+                            {{ email.get_priority_display }}
+                        </span>
+
+                        <!-- Action Buttons -->
+                        <div class="btn-group-vertical d-grid gap-1">
+                            {% if not email.is_read %}
+                            <button class="btn btn-sm btn-outline-primary" onclick="markAsRead({{ email.id }})">
+                                <i class="fas fa-check me-1"></i>Mark Read
+                            </button>
+                            {% endif %}
+                            <a href="{% url 'email_notes' email.id %}" class="btn btn-sm btn-outline-info">
+                                <i class="fas fa-sticky-note me-1"></i>Notes ({{ email.notes.count }})
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% empty %}
+    <div class="col-12">
+        <div class="text-center py-5">
+            <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+            <h4 class="text-muted">No emails found</h4>
+            <p class="text-muted">Try adjusting your search criteria or check back later.</p>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Pagination -->
+{% if emails.has_other_pages %}
+<nav aria-label="Email pagination" class="mt-4">
+    <ul class="pagination justify-content-center">
+        {% if emails.has_previous %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ emails.previous_page_number }}{% if search_term %}&search={{ search_term }}{% endif %}">
+                <i class="fas fa-chevron-left"></i>
+            </a>
         </li>
-        {% empty %}
-        <li>No emails found.</li>
+        {% endif %}
+
+        {% for num in emails.paginator.page_range %}
+        {% if emails.number == num %}
+        <li class="page-item active">
+            <span class="page-link">{{ num }}</span>
+        </li>
+        {% else %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ num }}{% if search_term %}&search={{ search_term }}{% endif %}">{{ num }}</a>
+        </li>
+        {% endif %}
         {% endfor %}
+
+        {% if emails.has_next %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ emails.next_page_number }}{% if search_term %}&search={{ search_term }}{% endif %}">
+                <i class="fas fa-chevron-right"></i>
+            </a>
+        </li>
+        {% endif %}
     </ul>
-</body>
-</html>
+</nav>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function markAsRead(emailId) {
+    fetch(`/api/emails/${emailId}/mark_as_read/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            'Content-Type': 'application/json',
+        },
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status) {
+            showNotification('Email marked as read', 'success');
+            location.reload();
+        }
+    })
+    .catch(error => {
+        showNotification('Failed to mark email as read', 'error');
+    });
+}
+
+function markAllAsRead() {
+    if (confirm('Mark all emails as read?')) {
+        // Implementation for marking all emails as read
+        showNotification('Feature coming soon!', 'info');
+    }
+}
+</script>
+{% endblock %}

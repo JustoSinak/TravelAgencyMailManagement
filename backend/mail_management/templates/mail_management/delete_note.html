@@ -1,0 +1,82 @@
+{% extends 'mail_management/base.html' %}
+
+{% block title %}Delete Note - {{ email.subject }}{% endblock %}
+
+{% block content %}
+<!-- Breadcrumb -->
+<div class="row mb-4">
+    <div class="col-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item">
+                    <a href="{% url 'email_catalog' %}"><i class="fas fa-inbox me-1"></i>Inbox</a>
+                </li>
+                <li class="breadcrumb-item">
+                    <a href="{% url 'email_notes' email.id %}">{{ email.subject|truncatechars:30 }}</a>
+                </li>
+                <li class="breadcrumb-item active">Delete Note</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<!-- Delete Confirmation -->
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card border-danger">
+            <div class="card-header bg-danger text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-trash me-2"></i>Delete Note
+                </h5>
+            </div>
+            <div class="card-body">
+                <!-- Email Context -->
+                <div class="alert alert-info">
+                    <h6><i class="fas fa-envelope me-2"></i>Email: {{ email.subject }}</h6>
+                    <p class="mb-0 small">From: {{ email.sender }} • {{ email.received_at|date:"M d, Y H:i" }}</p>
+                </div>
+
+                <!-- Note Preview -->
+                <div class="alert alert-warning">
+                    <h6><i class="fas fa-sticky-note me-2"></i>Note to be deleted:</h6>
+                    <div class="bg-white p-3 rounded border">
+                        <p class="mb-2">{{ note.content|linebreaks }}</p>
+                        <small class="text-muted">
+                            Created by {{ note.author.get_full_name|default:note.author.username }} 
+                            on {{ note.created_at|date:"M d, Y H:i" }}
+                        </small>
+                    </div>
+                </div>
+
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>Warning:</strong> This action cannot be undone. The note will be permanently deleted.
+                </div>
+
+                <!-- Confirmation Form -->
+                <form method="post" class="d-flex justify-content-between">
+                    {% csrf_token %}
+                    <div>
+                        <button type="submit" class="btn btn-danger me-2">
+                            <i class="fas fa-trash me-1"></i>Yes, Delete Note
+                            <span class="loading-spinner spinner-border spinner-border-sm ms-2" role="status"></span>
+                        </button>
+                        <a href="{% url 'email_notes' email.id %}" class="btn btn-secondary">
+                            <i class="fas fa-times me-1"></i>Cancel
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Form submission with loading state
+document.querySelector('form').addEventListener('submit', function(e) {
+    showLoading(true);
+});
+</script>
+{% endblock %}

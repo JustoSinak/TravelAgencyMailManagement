@@ -1,26 +1,239 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Email Notes</title>
-</head>
-<body>
-    <h1>Notes for: {{ email.subject }}</h1>
-    <a href="{% url 'email_catalog' %}">Back to Email Catalog</a>
-    <ul>
-        {% for note in notes %}
-        <li>
-            <p>{{ note.content }}</p>
-            <small>By {{ note.author }} on {{ note.created_at|date:"Y-m-d H:i" }}</small>
-        </li>
-        {% empty %}
-        <li>No notes found.</li>
-        {% endfor %}
-    </ul>
-    <h2>Add a Note</h2>
-    <form method="post" action="">
-        {% csrf_token %}
-        <textarea name="content" minlength="10" required></textarea><br>
-        <button type="submit">Add Note</button>
-    </form>
-</body>
-</html>
+{% extends 'mail_management/base.html' %}
+
+{% block title %}Email Notes - {{ email.subject }}{% endblock %}
+
+{% block content %}
+<!-- Email Header -->
+<div class="row mb-4">
+    <div class="col-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item">
+                    <a href="{% url 'email_catalog' %}"><i class="fas fa-inbox me-1"></i>Inbox</a>
+                </li>
+                <li class="breadcrumb-item active">Email Notes</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<!-- Email Details Card -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <div class="row align-items-center">
+                    <div class="col-md-8">
+                        <h4 class="mb-0">
+                            <i class="fas fa-envelope-open me-2"></i>
+                            {{ email.subject }}
+                        </h4>
+                    </div>
+                    <div class="col-md-4 text-end">
+                        <span class="badge bg-{% if email.priority == 'H' %}danger{% elif email.priority == 'M' %}warning{% else %}success{% endif %}">
+                            {{ email.get_priority_display }} Priority
+                        </span>
+                        {% if not email.is_read %}
+                        <span class="badge bg-warning ms-2">Unread</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <p class="mb-1">
+                            <strong><i class="fas fa-user me-2"></i>From:</strong> {{ email.sender }}
+                        </p>
+                        <p class="mb-1">
+                            <strong><i class="fas fa-clock me-2"></i>Received:</strong> {{ email.received_at|date:"F d, Y \a\t H:i" }}
+                        </p>
+                    </div>
+                    <div class="col-md-6">
+                        {% if email.categories.all %}
+                        <p class="mb-1">
+                            <strong><i class="fas fa-tags me-2"></i>Categories:</strong>
+                            {% for category in email.categories.all %}
+                            <span class="badge bg-secondary me-1">{{ category.name }}</span>
+                            {% endfor %}
+                        </p>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="border-top pt-3">
+                    <h6><i class="fas fa-file-alt me-2"></i>Email Content:</h6>
+                    <div class="bg-light p-3 rounded">
+                        {{ email.body|linebreaks }}
+                    </div>
+                </div>
+
+                {% if not email.is_read %}
+                <div class="mt-3">
+                    <button class="btn btn-primary" onclick="markAsRead({{ email.id }})">
+                        <i class="fas fa-check me-1"></i>Mark as Read
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Notes Section -->
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-sticky-note me-2"></i>
+                    Notes ({{ notes.count }})
+                </h5>
+            </div>
+            <div class="card-body">
+                {% for note in notes %}
+                <div class="note-item">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <div>
+                            <strong>{{ note.author.get_full_name|default:note.author.username }}</strong>
+                            <small class="text-muted ms-2">
+                                <i class="fas fa-clock me-1"></i>
+                                {{ note.created_at|date:"M d, Y H:i" }}
+                                {% if note.updated_at != note.created_at %}
+                                (edited {{ note.updated_at|date:"M d, Y H:i" }})
+                                {% endif %}
+                            </small>
+                        </div>
+                        {% if note.author == user %}
+                        <div class="btn-group btn-group-sm">
+                            <a href="{% url 'edit_note' note.id %}" class="btn btn-outline-primary btn-sm">
+                                <i class="fas fa-edit"></i>
+                            </a>
+                            <a href="{% url 'delete_note' note.id %}" class="btn btn-outline-danger btn-sm">
+                                <i class="fas fa-trash"></i>
+                            </a>
+                        </div>
+                        {% endif %}
+                    </div>
+                    <p class="mb-0">{{ note.content|linebreaks }}</p>
+                </div>
+                {% empty %}
+                <div class="text-center py-4">
+                    <i class="fas fa-sticky-note fa-2x text-muted mb-2"></i>
+                    <p class="text-muted">No notes yet. Add the first note below!</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Note Form -->
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-plus me-2"></i>Add New Note
+                </h6>
+            </div>
+            <div class="card-body">
+                <form method="post" action="" id="noteForm">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="content" class="form-label">Note Content</label>
+                        <textarea name="content" id="content" class="form-control" rows="6"
+                                  minlength="10" required
+                                  placeholder="Enter your note here (minimum 10 characters)..."></textarea>
+                        <div class="form-text">
+                            <span id="charCount">0</span> / 10 minimum characters
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-success w-100">
+                        <i class="fas fa-save me-1"></i>Add Note
+                        <span class="loading-spinner spinner-border spinner-border-sm ms-2" role="status"></span>
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-bolt me-2"></i>Quick Actions
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <button class="btn btn-outline-primary btn-sm" onclick="addQuickNote('Follow up required')">
+                        <i class="fas fa-flag me-1"></i>Follow Up Required
+                    </button>
+                    <button class="btn btn-outline-success btn-sm" onclick="addQuickNote('Issue resolved')">
+                        <i class="fas fa-check me-1"></i>Issue Resolved
+                    </button>
+                    <button class="btn btn-outline-warning btn-sm" onclick="addQuickNote('Needs more information')">
+                        <i class="fas fa-question me-1"></i>Needs Info
+                    </button>
+                    <button class="btn btn-outline-info btn-sm" onclick="addQuickNote('Customer contacted')">
+                        <i class="fas fa-phone me-1"></i>Customer Contacted
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Character counter for note textarea
+document.getElementById('content').addEventListener('input', function() {
+    const charCount = this.value.length;
+    document.getElementById('charCount').textContent = charCount;
+
+    const submitBtn = document.querySelector('button[type="submit"]');
+    if (charCount >= 10) {
+        submitBtn.disabled = false;
+        document.getElementById('charCount').className = 'text-success';
+    } else {
+        submitBtn.disabled = true;
+        document.getElementById('charCount').className = 'text-danger';
+    }
+});
+
+// Form submission with loading state
+document.getElementById('noteForm').addEventListener('submit', function(e) {
+    showLoading(true);
+});
+
+// Quick note functions
+function addQuickNote(noteText) {
+    document.getElementById('content').value = noteText;
+    document.getElementById('content').dispatchEvent(new Event('input'));
+}
+
+function markAsRead(emailId) {
+    fetch(`/api/emails/${emailId}/mark_as_read/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            'Content-Type': 'application/json',
+        },
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status) {
+            showNotification('Email marked as read', 'success');
+            location.reload();
+        }
+    })
+    .catch(error => {
+        showNotification('Failed to mark email as read', 'error');
+    });
+}
+
+// Initialize character counter
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('content').dispatchEvent(new Event('input'));
+});
+</script>
+{% endblock %}

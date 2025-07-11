@@ -1,9 +1,38 @@
 import requests
 import logging
-from celery import shared_task
-from asgiref.sync import async_to_sync
-from channels.layers import get_channel_layer
-from .models import Email, Category
+import os
+import importlib.util
+
+# Import Celery only if available
+if importlib.util.find_spec('celery') is not None:
+    from celery import shared_task
+else:
+    # Create a dummy decorator if Celery is not available
+    def shared_task(func):
+        return func
+
+# Import channels only if available
+if importlib.util.find_spec('channels') is not None:
+    from asgiref.sync import async_to_sync
+    from channels.layers import get_channel_layer
+else:
+    # Create dummy functions if channels is not available
+    def async_to_sync(func):
+        return func
+    def get_channel_layer():
+        return None
+
+from .models import Email, Category, UserAction
+
+# Import notifications only if the module exists
+try:
+    from .notifications import send_classification_notification, send_recommendation_notification
+except ImportError:
+    # Create dummy functions if notifications module is not available
+    def send_classification_notification(*args, **kwargs):
+        pass
+    def send_recommendation_notification(*args, **kwargs):
+        pass
 
 logger = logging.getLogger(__name__)
 
@@ -18,8 +47,9 @@ def classify_and_sort_email(email_id):
             "sender": email.sender
         }
         
+        ml_service_url = os.getenv('ML_SERVICE_URL', 'http://localhost:8001')
         response = requests.post(
-            "http://ml-service:8000/classify/",
+            f"{ml_service_url}/classify/",
             json=data,
             timeout=10
         )
@@ -34,21 +64,107 @@ def classify_and_sort_email(email_id):
         
         email.categories.add(category)
         email.save()
-        
-        channel_layer = get_channel_layer()
-        async_to_sync(channel_layer.group_send)(
-            f"user_{email.user.id}",
-            {
-                "type": "send.notification",
-                "data": {
-                    "type": "EMAIL_SORTED",
-                    "email_id": email.id,
-                    "category": category.name
-                }
-            }
+
+        # Send real-time notification
+        send_classification_notification(
+            email.user.id,
+            email.id,
+            category.name,
+            result.get('confidence')
         )
         
         return True
     except Exception as e:
         logger.error(f"Error classifying email {email_id}: {str(e)}")
         return False
+
+@shared_task
+def record_user_action_for_recommendations(user_id, email_id, action_type, metadata=None):
+    """Record user action for recommendation system"""
+    try:
+        ml_service_url = os.getenv('ML_SERVICE_URL', 'http://localhost:8001')
+
+        data = {
+            "user_id": user_id,
+            "email_id": email_id,
+            "action_type": action_type,
+            "metadata": metadata or {}
+        }
+
+        response = requests.post(
+            f"{ml_service_url}/record-action/",
+            json=data,
+            timeout=5
+        )
+        response.raise_for_status()
+
+        logger.info(f"User action recorded: {action_type} by user {user_id} on email {email_id}")
+        return True
+
+    except Exception as e:
+        logger.error(f"Error recording user action: {str(e)}")
+        return False
+
+@shared_task
+def add_email_features_for_recommendations(email_id):
+    """Add email features to recommendation system"""
+    try:
+        email = Email.objects.get(id=email_id)
+        ml_service_url = os.getenv('ML_SERVICE_URL', 'http://localhost:8001')
+
+        categories = [cat.name for cat in email.categories.all()]
+
+        data = {
+            "email_id": email_id,
+            "subject": email.subject,
+            "body": email.body,
+            "sender": email.sender,
+            "categories": categories
+        }
+
+        response = requests.post(
+            f"{ml_service_url}/add-email-features/",
+            json=data,
+            timeout=5
+        )
+        response.raise_for_status()
+
+        logger.info(f"Email features added for email {email_id}")
+        return True
+
+    except Exception as e:
+        logger.error(f"Error adding email features: {str(e)}")
+        return False
+
+@shared_task
+def get_user_recommendations(user_id, num_recommendations=5):
+    """Get email recommendations for a user"""
+    try:
+        ml_service_url = os.getenv('ML_SERVICE_URL', 'http://localhost:8001')
+
+        data = {
+            "user_id": user_id,
+            "num_recommendations": num_recommendations
+        }
+
+        response = requests.post(
+            f"{ml_service_url}/recommendations/",
+            json=data,
+            timeout=10
+        )
+        response.raise_for_status()
+
+        result = response.json()
+
+        # Send real-time notification
+        send_recommendation_notification(
+            user_id,
+            result['total_recommendations'],
+            result['recommendations']
+        )
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Error getting recommendations for user {user_id}: {str(e)}")
+        return None

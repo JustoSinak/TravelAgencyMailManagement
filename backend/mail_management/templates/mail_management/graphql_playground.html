@@ -1,0 +1,287 @@
+{% extends 'mail_management/base.html' %}
+
+{% block title %}GraphQL Playground - Travel Agency Mail Management{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h2><i class="fas fa-code me-2"></i>GraphQL Playground</h2>
+        <p class="text-muted">Test GraphQL queries and mutations for the mail management system.</p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-play me-2"></i>Query Editor
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label for="graphqlQuery" class="form-label">GraphQL Query</label>
+                    <textarea id="graphqlQuery" class="form-control" rows="15" placeholder="Enter your GraphQL query here...">query GetEmails {
+  emails {
+    id
+    subject
+    sender
+    receivedAt
+    priority
+    isRead
+    categories {
+      id
+      name
+    }
+    notes {
+      id
+      content
+      author {
+        username
+      }
+      createdAt
+    }
+  }
+}</textarea>
+                </div>
+                <div class="mb-3">
+                    <label for="graphqlVariables" class="form-label">Variables (JSON)</label>
+                    <textarea id="graphqlVariables" class="form-control" rows="4" placeholder='{"variable": "value"}'>{}</textarea>
+                </div>
+                <button type="button" class="btn btn-primary" onclick="executeQuery()">
+                    <i class="fas fa-play me-1"></i>Execute Query
+                    <span class="loading-spinner spinner-border spinner-border-sm ms-2" role="status"></span>
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-terminal me-2"></i>Response
+                </h5>
+            </div>
+            <div class="card-body">
+                <pre id="queryResponse" class="bg-light p-3 rounded" style="height: 400px; overflow-y: auto;">
+Execute a query to see results here...
+                </pre>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Sample Queries -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-book me-2"></i>Sample Queries
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Basic Queries</h6>
+                        <div class="list-group">
+                            <button type="button" class="list-group-item list-group-item-action" onclick="loadSampleQuery('getAllEmails')">
+                                Get All Emails
+                            </button>
+                            <button type="button" class="list-group-item list-group-item-action" onclick="loadSampleQuery('getUnreadEmails')">
+                                Get Unread Emails
+                            </button>
+                            <button type="button" class="list-group-item list-group-item-action" onclick="loadSampleQuery('getEmailById')">
+                                Get Email by ID
+                            </button>
+                            <button type="button" class="list-group-item list-group-item-action" onclick="loadSampleQuery('getCategories')">
+                                Get All Categories
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Mutations</h6>
+                        <div class="list-group">
+                            <button type="button" class="list-group-item list-group-item-action" onclick="loadSampleQuery('createNote')">
+                                Create Note
+                            </button>
+                            <button type="button" class="list-group-item list-group-item-action" onclick="loadSampleQuery('markEmailAsRead')">
+                                Mark Email as Read
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const sampleQueries = {
+    getAllEmails: `query GetAllEmails {
+  emails {
+    id
+    subject
+    sender
+    receivedAt
+    priority
+    isRead
+    categories {
+      id
+      name
+    }
+  }
+}`,
+    getUnreadEmails: `query GetUnreadEmails {
+  emails(isRead: false) {
+    id
+    subject
+    sender
+    receivedAt
+    priority
+  }
+}`,
+    getEmailById: `query GetEmailById($emailId: ID!) {
+  email(id: $emailId) {
+    id
+    subject
+    body
+    sender
+    receivedAt
+    priority
+    isRead
+    categories {
+      id
+      name
+      description
+    }
+    notes {
+      id
+      content
+      author {
+        username
+        firstName
+        lastName
+      }
+      createdAt
+      updatedAt
+    }
+  }
+}`,
+    getCategories: `query GetCategories {
+  categories {
+    id
+    name
+    description
+    createdAt
+  }
+}`,
+    createNote: `mutation CreateNote($emailId: ID!, $content: String!) {
+  createNote(emailId: $emailId, content: $content) {
+    success
+    errors
+    note {
+      id
+      content
+      author {
+        username
+      }
+      createdAt
+    }
+  }
+}`,
+    markEmailAsRead: `mutation MarkEmailAsRead($emailId: ID!) {
+  markEmailAsRead(emailId: $emailId) {
+    success
+    errors
+    email {
+      id
+      subject
+      isRead
+    }
+  }
+}`
+};
+
+function loadSampleQuery(queryName) {
+    const query = sampleQueries[queryName];
+    if (query) {
+        document.getElementById('graphqlQuery').value = query;
+        
+        // Set sample variables for queries that need them
+        if (queryName === 'getEmailById') {
+            document.getElementById('graphqlVariables').value = '{"emailId": "1"}';
+        } else if (queryName === 'createNote') {
+            document.getElementById('graphqlVariables').value = '{"emailId": "1", "content": "This is a sample note with more than 10 characters"}';
+        } else if (queryName === 'markEmailAsRead') {
+            document.getElementById('graphqlVariables').value = '{"emailId": "1"}';
+        } else {
+            document.getElementById('graphqlVariables').value = '{}';
+        }
+    }
+}
+
+async function executeQuery() {
+    const query = document.getElementById('graphqlQuery').value;
+    const variables = document.getElementById('graphqlVariables').value;
+    const responseElement = document.getElementById('queryResponse');
+    
+    if (!query.trim()) {
+        responseElement.textContent = 'Please enter a GraphQL query.';
+        return;
+    }
+    
+    showLoading(true);
+    responseElement.textContent = 'Executing query...';
+    
+    try {
+        let parsedVariables = {};
+        if (variables.trim()) {
+            parsedVariables = JSON.parse(variables);
+        }
+        
+        const response = await fetch('/graphql/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            },
+            body: JSON.stringify({
+                query: query,
+                variables: parsedVariables
+            })
+        });
+        
+        const result = await response.json();
+        responseElement.textContent = JSON.stringify(result, null, 2);
+        
+        if (result.errors) {
+            responseElement.className = 'bg-danger text-white p-3 rounded';
+        } else {
+            responseElement.className = 'bg-light p-3 rounded';
+        }
+        
+    } catch (error) {
+        responseElement.textContent = `Error: ${error.message}`;
+        responseElement.className = 'bg-danger text-white p-3 rounded';
+    } finally {
+        showLoading(false);
+    }
+}
+
+// Add syntax highlighting for better UX
+document.addEventListener('DOMContentLoaded', function() {
+    const queryTextarea = document.getElementById('graphqlQuery');
+    const variablesTextarea = document.getElementById('graphqlVariables');
+    
+    // Basic syntax highlighting could be added here
+    // For now, we'll just ensure proper formatting
+    queryTextarea.addEventListener('input', function() {
+        // Auto-format could be implemented here
+    });
+});
+</script>
+{% endblock %}

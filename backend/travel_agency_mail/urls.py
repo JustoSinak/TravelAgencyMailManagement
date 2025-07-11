@@ -17,10 +17,20 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from django.views.decorators.csrf import csrf_exempt
+import importlib.util
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/', include('backend.mail_management.urls')),
+    path('api/', include('mail_management.urls')),
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('', include('mail_management.urls')),  # Include mail_management URLs at root level for web interface
 ]
+
+# Add GraphQL endpoint only if graphene_django is available
+if importlib.util.find_spec('graphene_django') is not None:
+    from graphene_django.views import GraphQLView
+    urlpatterns.append(
+        path('graphql/', csrf_exempt(GraphQLView.as_view(graphiql=True)))
+    )
